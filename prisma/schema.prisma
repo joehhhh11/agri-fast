@@ -1,0 +1,172 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Role {
+  id     Int    @id @default(autoincrement())
+  name   String @unique // e.g., PLATFORM_ADMIN, COMPANY_ADMIN, SUPERVISOR, WORKER
+  users  User[]
+}
+
+model Farm {
+  id           Int       @id @default(autoincrement())
+  name         String
+  ruc          String
+  address      String
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  isActive     Boolean   @default(true)
+  users        User[]
+  groups       Group[]
+  plots        Plot[]
+  weatherLogs  Weather[]
+}
+
+model User {
+  id             Int           @id @default(autoincrement())
+  name           String
+  email          String        @unique
+  password       String
+  phone          String?       @unique
+  dni            String
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+  roleId         Int
+  role           Role          @relation(fields: [roleId], references: [id])
+  farmId         Int?
+  farm           Farm?         @relation(fields: [farmId], references: [id])
+  supervisedGroups Group[]     @relation("SupervisorGroup")
+  loginLocal     LoginLocal?
+  sessions       Session[]
+  activityLogs   ActivityLog[]
+}
+
+model Session {
+  id         Int      @id @default(autoincrement())
+  token      String   @unique
+  createdAt  DateTime @default(now())
+  expiresAt  DateTime
+  userId     Int
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model LoginLocal {
+  id         Int      @id @default(autoincrement())
+  localToken String
+  expiresAt  DateTime
+  userId     Int      @unique
+  user       User     @relation(fields: [userId], references: [id])
+}
+
+model Group {
+  id           Int      @id @default(autoincrement())
+  name         String
+  date         DateTime
+  farmId       Int
+  supervisorId Int
+  farm         Farm     @relation(fields: [farmId], references: [id])
+  supervisor   User     @relation("SupervisorGroup", fields: [supervisorId], references: [id])
+  members      GroupWorker[]
+  workEntries  WorkEntry[]
+}
+
+model Worker {
+  id           Int      @id @default(autoincrement())
+  name         String
+  dni          String
+  phone        String
+  address      String
+  qrCode       String   @unique
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  deletedAt    DateTime?
+  groupLinks   GroupWorker[]
+  workEntries  WorkEntry[]
+}
+
+model GroupWorker {
+  id         Int     @id @default(autoincrement())
+  groupId    Int
+  workerId   Int
+  group      Group   @relation(fields: [groupId], references: [id])
+  worker     Worker  @relation(fields: [workerId], references: [id])
+  
+  @@unique([groupId, workerId])
+}
+
+model Plot {
+  id          Int          @id @default(autoincrement())
+  name        String
+  cropType    String
+  location    String
+  qrCode      String      @unique
+  farmId      Int
+  farm        Farm         @relation(fields: [farmId], references: [id])
+  sensors     SensorData[]
+  workEntries WorkEntry[]
+}
+
+model WorkEntry {
+  id          Int       @id @default(autoincrement())
+  type        String    // e.g., "PLANTING", "HARVESTING"
+  paymentType String    // e.g., "DAILY", "PIECEWORK"
+  date        DateTime
+  workerId    Int
+  groupId     Int
+  plotId      Int
+  worker      Worker    @relation(fields: [workerId], references: [id])
+  group       Group     @relation(fields: [groupId], references: [id])
+  plot        Plot      @relation(fields: [plotId], references: [id])
+  dailyWork   DailyWork?
+  piecework   Piecework?
+}
+
+model DailyWork {
+  id         Int        @id @default(autoincrement())
+  present    Boolean
+  workEntryId Int       @unique
+  workEntry  WorkEntry  @relation(fields: [workEntryId], references: [id])
+}
+
+model Piecework {
+  id          Int        @id @default(autoincrement())
+  quantity    Float
+  unit        String
+  workEntryId Int        @unique
+  workEntry   WorkEntry  @relation(fields: [workEntryId], references: [id])
+}
+
+model Weather {
+  id          Int      @id @default(autoincrement())
+  temperature Float
+  humidity    Float
+  date        DateTime
+  farmId      Int
+  farm        Farm     @relation(fields: [farmId], references: [id])
+}
+
+model SensorData {
+  id         Int      @id @default(autoincrement())
+  sensorType String
+  value      Float
+  date       DateTime
+  plotId     Int
+  plot       Plot     @relation(fields: [plotId], references: [id])
+}
+
+model ActivityLog {
+  id          Int      @id @default(autoincrement())
+  action      String   // e.g., "CREATE_GROUP"
+  entity      String   // e.g., "Group"
+  referenceId Int?
+  date        DateTime @default(now())
+  userId      Int
+  user        User     @relation(fields: [userId], references: [id])
+}
